@@ -519,6 +519,12 @@ def play_card(
                 events.extend(ev)
             # Player remains on main layer, waiting for share (or already
             # distributed -> they will pick up on the next transition check).
+            # Also check transitions for other players whose main may already
+            # be empty — they should receive their buffer share immediately.
+            for p in room.players:
+                if p.id != player_id:
+                    _, ev = check_layer_transition(room, p.id)
+                    events.extend(ev)
         # 4-5p falls through: check_layer_transition moves them to hidden.
 
     # Run layer transitions (handles main->hidden for 4-5p, buffer->hidden,

@@ -329,6 +329,42 @@ def test_forced_take_bottom_when_turn_returns_to_waiting_trigger():
 
 
 # ===========================================================================
+# Regression: both players empty main hands - non-trigger gets share immediately
+# ===========================================================================
+
+def test_2p_both_empty_main_non_trigger_gets_share_immediately():
+    """Regression: when A empties their last main card (triggering buffer
+    distribution), B's main hand is already empty.  B must immediately
+    receive their pending share and move to the buffer layer so they can
+    still play.  Previously check_layer_transition was never called for B,
+    leaving both players unable to act."""
+    buffer_cards = [C("9D"), C("JC"), C("6H"), C("7C")]
+    players = [
+        make_player("p0", [C("9H")]),  # will trigger distribution
+        make_player("p1", []),          # already empty - the problematic case
+    ]
+    room = room_with(players, trump="D", stack=[], current_idx=0)
+    room.buffer_pile = buffer_cards
+    rng = random.Random(42)
+    room.rng = rng
+
+    # p0 plays their last main card; stack had 0 cards, so no bito yet.
+    room, events = play_card(room, "p0", C("9H"))
+
+    # Buffer distribution must have fired.
+    assert room.buffer_distributed is True
+    # p0 is deferred (waiting for share).
+    assert room.players[0].waiting_for_share is True
+    # p1 must NOT be stuck on the main layer with an empty hand.
+    p1 = room.players[1]
+    assert p1.layer == "buffer", f"p1.layer={p1.layer!r}; p1 should have moved to buffer"
+    assert len(p1.buffer_share) > 0, "p1 should have received their buffer share"
+    # A buffer_share event must have been emitted for p1.
+    share_events = [e for e in events if e["type"] == "buffer_share" and e["payload"]["_to"] == "p1"]
+    assert len(share_events) == 1
+
+
+# ===========================================================================
 # Layer transitions: buffer->hidden skip, 4-5p direct main->hidden
 # ===========================================================================
 
