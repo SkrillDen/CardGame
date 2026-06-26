@@ -8,8 +8,8 @@ import { useCallback, useEffect } from "react";
 import { useGameStore } from "../store/gameStore";
 import type { ServerMessage } from "../types";
 
-const WS_BASE =
-  (import.meta.env.VITE_WS_URL as string | undefined) ?? "ws://localhost:8000";
+const proto = location.protocol === "https:" ? "wss:" : "ws:";
+const WS_BASE = `${proto}//${location.host}`;
 
 const MAX_RETRIES = 5;
 const BASE_DELAY = 1000;

@@ -19,10 +19,12 @@ from __future__ import annotations
 import json
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from game.engine import _public_state  # noqa: F401  (re-exported for convenience)
 from game.manager import ConnectionManager
@@ -129,6 +131,13 @@ async def websocket_endpoint(
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "rooms": len(manager.rooms)}
+
+
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
+else:
+    logger.warning("Frontend dist not found at %s — static files will not be served", _STATIC_DIR)
 
 
 if __name__ == "__main__":
