@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
+import { useT } from "../i18n";
 
 export function ActionBar() {
   const contribution = useGameStore((s) => s.contributionPhase);
@@ -18,6 +19,7 @@ export function ActionBar() {
 }
 
 function PlayBar() {
+  const t = useT();
   const selected = useGameStore((s) => s.selectedCard);
   const stack = useGameStore((s) => s.tableStack);
   const currentId = useGameStore((s) => s.currentId);
@@ -41,16 +43,16 @@ function PlayBar() {
           }
         }}
       >
-        Play card
+        {t.btnPlayCard}
       </button>
       <button
         className="secondary"
         disabled={!canTake}
         onClick={() => send({ type: "take_bottom", payload: {} })}
       >
-        Take bottom
+        {t.btnTakeBottom}
       </button>
-      {!isMyTurn && <span className="hint">Waiting for your turn…</span>}
+      {!isMyTurn && <span className="hint">{t.waitingForTurn}</span>}
     </div>
   );
 }
@@ -64,17 +66,18 @@ function ContributeBar({
   myHand: string[];
   send: (m: Parameters<ReturnType<typeof useGameStore.getState>["send"]>[0]) => void;
 }) {
+  const t = useT();
   const [picked, setPicked] = useState<string | null>(null);
   if (!due) {
     return (
       <div className="action-bar">
-        <span className="hint">Waiting for others to contribute…</span>
+        <span className="hint">{t.waitingContribute}</span>
       </div>
     );
   }
   return (
     <div className="action-bar" style={{ flexDirection: "column", alignItems: "stretch" }}>
-      <span className="hint">Pick a card to contribute to the buffer:</span>
+      <span className="hint">{t.pickContribute}</span>
       <div className="hand-wrap">
         {myHand.map((c) => (
           <button
@@ -96,7 +99,7 @@ function ContributeBar({
           }
         }}
       >
-        Contribute
+        {t.btnContribute}
       </button>
     </div>
   );

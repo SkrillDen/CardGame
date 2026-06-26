@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useGameStore } from "./store/gameStore";
+import { useT, useLocaleStore } from "./i18n";
 import { Lobby } from "./components/Lobby";
 import { Table } from "./components/Table";
 import { PlayerList } from "./components/PlayerList";
@@ -12,6 +13,9 @@ import { RulesModal } from "./components/RulesModal";
 import { Toasts } from "./components/Toast";
 
 export default function App() {
+  const t = useT();
+  const locale = useLocaleStore((s) => s.locale);
+  const setLocale = useLocaleStore((s) => s.setLocale);
   const ws = useWebSocket();
   const phase = useGameStore((s) => s.phase);
   const connected = useGameStore((s) => s.connected);
@@ -28,20 +32,28 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>♠ Durak</h1>
+        <h1>{t.appTitle}</h1>
         <div className="header-tools">
           <button
             type="button"
+            className="locale-button"
+            onClick={() => setLocale(locale === "en" ? "ru" : "en")}
+            title={locale === "en" ? "Переключить на русский" : "Switch to English"}
+          >
+            {locale === "en" ? "RU" : "EN"}
+          </button>
+          <button
+            type="button"
             className="info-button"
-            aria-label="Open game rules"
-            title="Game rules"
+            aria-label={t.openRules}
+            title={t.gameRulesTitle}
             onClick={() => setRulesOpen(true)}
           >
             i
           </button>
           <div className={`conn ${connected ? "" : "off"}`}>
             <span className="dot" />
-            {connected ? "Connected" : "Disconnected"}
+            {connected ? t.connected : t.disconnected}
             {roomId ? ` · ${roomId}` : ""}
           </div>
         </div>
@@ -64,9 +76,9 @@ export default function App() {
 
       {connectionLost && phase !== "lobby" && (
         <div className="connection-lost-banner">
-          <span>Соединение потеряно</span>
+          <span>{t.connectionLost}</span>
           <button type="button" onClick={handleBackToLobby}>
-            Вернуться в меню
+            {t.backToMenu}
           </button>
         </div>
       )}

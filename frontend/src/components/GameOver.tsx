@@ -1,8 +1,10 @@
 // Game-over modal. Names the loser (last player holding cards).
 
 import { useGameStore } from "../store/gameStore";
+import { useT } from "../i18n";
 
 export function GameOver() {
+  const t = useT();
   const loserId = useGameStore((s) => s.loserId);
   const players = useGameStore((s) => s.players);
   if (!loserId) return null;
@@ -11,11 +13,11 @@ export function GameOver() {
   return (
     <div className="overlay">
       <div className="modal">
-        <h2>Game over</h2>
-        <p>The last player holding cards loses:</p>
+        <h2>{t.gameOverHeading}</h2>
+        <p>{t.gameOverBody}</p>
         <div className="loser">{loser?.name ?? "—"}</div>
         <button className="primary" onClick={() => location.reload()}>
-          Back to lobby
+          {t.btnBackToLobby}
         </button>
       </div>
     </div>

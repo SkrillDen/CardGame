@@ -3,9 +3,11 @@
 // state via PlayerBadge.
 
 import { useGameStore } from "../store/gameStore";
+import { useT } from "../i18n";
 import { PlayerBadge } from "./PlayerBadge";
 
 export function PlayerList() {
+  const t = useT();
   const players = useGameStore((s) => s.players);
   const currentId = useGameStore((s) => s.currentId);
   const myId = useGameStore((s) => s.myPlayerId);
@@ -25,11 +27,11 @@ export function PlayerList() {
             <div className="meta">
               <span className="name">
                 {p.name}
-                {i === 0 && <span className="tag host">Host</span>}
-                {isCurrent && !p.eliminated && <span className="tag current">Turn</span>}
+                {i === 0 && <span className="tag host">{t.tagHost}</span>}
+                {isCurrent && !p.eliminated && <span className="tag current">{t.tagTurn}</span>}
               </span>
               <span className="sub">
-                <span>{p.card_count} cards</span>
+                <span>{t.cardCount(p.card_count)}</span>
                 <span className="chip" style={{ padding: "1px 6px" }}>
                   {p.layer}
                 </span>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
+import { useT } from "../i18n";
 import type { useWebSocket } from "../hooks/useWebSocket";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function Lobby({ ws }: Props) {
+  const t = useT();
   const [name, setName] = useState("");
   const [roomId, setRoomId] = useState("");
   const players = useGameStore((s) => s.players);
@@ -31,24 +33,24 @@ export function Lobby({ ws }: Props) {
   return (
     <div className="lobby">
       <div className="lobby-card">
-        <h2>Durak — Join a game</h2>
+        <h2>{t.lobbyHeading}</h2>
         <div className="field">
-          <label htmlFor="name">Your name</label>
+          <label htmlFor="name">{t.labelName}</label>
           <input
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Alice"
+            placeholder={t.placeholderName}
             disabled={seated}
           />
         </div>
         <div className="field">
-          <label htmlFor="room">Room code (leave blank to create)</label>
+          <label htmlFor="room">{t.labelRoom}</label>
           <input
             id="room"
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
-            placeholder="e.g. ABC123"
+            placeholder={t.placeholderRoom}
             disabled={seated}
           />
         </div>
@@ -60,18 +62,18 @@ export function Lobby({ ws }: Props) {
               onClick={handleCreate}
               disabled={!name.trim()}
             >
-              {roomId.trim() ? "Join" : "Create & Join"}
+              {roomId.trim() ? t.btnJoin : t.btnCreateJoin}
             </button>
           </div>
         ) : (
           <>
             <div className="roster">
-              <h3>Players ({players.length})</h3>
+              <h3>{t.rosterHeading(players.length)}</h3>
               <ul>
                 {players.map((p, i) => (
                   <li key={p.id}>
                     <span className="tag host" hidden={i !== 0}>
-                      Host
+                      {t.tagHost}
                     </span>
                     {p.name}
                   </li>
@@ -84,19 +86,19 @@ export function Lobby({ ws }: Props) {
                   className="primary"
                   onClick={handleStart}
                   disabled={players.length < 2}
-                  title={players.length < 2 ? "Need at least 2 players" : undefined}
+                  title={players.length < 2 ? t.startDisabledHint : undefined}
                 >
-                  Start game
+                  {t.btnStart}
                 </button>
               ) : (
-                <span className="hint">Waiting for host to start…</span>
+                <span className="hint">{t.waitingForHost}</span>
               )}
             </div>
           </>
         )}
         {!connected && seated && (
           <p className="hint" style={{ marginTop: 12 }}>
-            Connecting…
+            {t.connecting}
           </p>
         )}
       </div>

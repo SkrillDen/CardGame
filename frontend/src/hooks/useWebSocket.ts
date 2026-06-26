@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useGameStore } from "../store/gameStore";
+import { getT } from "../i18n";
 import type { ServerMessage } from "../types";
 
 const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -56,7 +57,7 @@ function open(url: string) {
     retries = 0;
     useGameStore.getState().setWs(ws);
     useGameStore.getState().setConnected(true);
-    useGameStore.getState().pushToast("info", "Connected");
+    useGameStore.getState().pushToast("info", getT().toastConnected);
   };
 
   ws.onmessage = (ev) => {
@@ -64,7 +65,7 @@ function open(url: string) {
     try {
       msg = JSON.parse(ev.data as string) as ServerMessage;
     } catch {
-      useGameStore.getState().pushToast("error", "Received malformed message");
+      useGameStore.getState().pushToast("error", getT().toastMalformed);
       return;
     }
     useGameStore.getState().dispatch(msg);
@@ -79,15 +80,13 @@ function open(url: string) {
     useGameStore.getState().setWs(null);
     if (manualClose) return;
     if (retries >= MAX_RETRIES) {
-      useGameStore
-        .getState()
-        .pushToast("error", "Connection lost — gave up reconnecting");
+      useGameStore.getState().pushToast("error", getT().toastGaveUp);
       useGameStore.getState().setConnectionLost(true);
       return;
     }
     const delay = Math.min(BASE_DELAY * 2 ** retries, MAX_DELAY);
     retries += 1;
-    useGameStore.getState().pushToast("info", `Reconnecting in ${delay / 1000}s…`);
+    useGameStore.getState().pushToast("info", getT().toastReconnecting(delay / 1000));
     pendingTimer = setTimeout(() => open(url), delay);
   };
 }

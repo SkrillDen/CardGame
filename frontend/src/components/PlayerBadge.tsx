@@ -2,6 +2,7 @@
 // revealed, shows a count badge; once revealed, shows the faces inline.
 
 import { CardView } from "./CardView";
+import { useT } from "../i18n";
 
 interface Props {
   hiddenCount: number;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function PlayerBadge({ hiddenCount, revealedCards, isMe }: Props) {
+  const t = useT();
   if (revealedCards.length > 0) {
     return (
       <div className="hand-wrap" style={{ minHeight: "auto" }}>
@@ -20,7 +22,7 @@ export function PlayerBadge({ hiddenCount, revealedCards, isMe }: Props) {
     );
   }
   if (hiddenCount > 0 && isMe) {
-    return <span className="badge-hidden">hidden: {hiddenCount}</span>;
+    return <span className="badge-hidden">{t.hiddenCount(hiddenCount)}</span>;
   }
   return null;
 }

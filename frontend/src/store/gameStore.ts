@@ -4,6 +4,7 @@
 // `send`.
 
 import { create } from "zustand";
+import { getT } from "../i18n";
 import type {
   CardCode,
   ClientMessage,
@@ -106,7 +107,7 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
   send: (msg) => {
     const ws = get().ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      get().pushToast("error", "Not connected");
+      get().pushToast("error", getT().toastNotConnected);
       return;
     }
     ws.send(JSON.stringify(msg));
@@ -149,7 +150,7 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
       // ---- Game start ----
       case "game_started":
         set({ phase: "playing", trump: payload.trump });
-        get().pushToast("info", `Game started — trump is ${payload.trump}`);
+        get().pushToast("info", getT().toastGameStarted(payload.trump));
         break;
 
       // ---- Public snapshot (re-applied after every action) ----
@@ -194,23 +195,20 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
         // If I took, the card enters my main hand (server's hand_update will
         // confirm). No optimistic change needed here.
         if (payload.reason === "forced" && payload.player_id === get().myPlayerId) {
-          get().pushToast("error", "Forced to take the bottom card");
+          get().pushToast("error", getT().toastForcedTake);
         }
         break;
 
       case "bito":
-        get().pushToast("success", `Stack cleared (bito #${payload.bito_count})`);
+        get().pushToast("success", getT().toastBito(payload.bito_count));
         break;
 
       case "buffer_request":
-        get().pushToast("info", "Choose a card to contribute to the buffer");
+        get().pushToast("info", getT().toastContributeRequest);
         break;
 
       case "buffer_triggered":
-        get().pushToast(
-          "info",
-          `Buffer distributed — new trump is ${payload.new_trump}`
-        );
+        get().pushToast("info", getT().toastBufferTriggered(payload.new_trump));
         break;
 
       case "buffer_contributed":
@@ -230,13 +228,13 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
 
       case "turn_skipped":
         if (payload.player_id === get().myPlayerId) {
-          get().pushToast("info", "Turn skipped (hidden cards revealed)");
+          get().pushToast("info", getT().toastTurnSkipped);
         }
         break;
 
       case "player_out": {
         const out = get().players.find((p) => p.id === payload.player_id);
-        get().pushToast("info", `${out?.name ?? "A player"} is out`);
+        get().pushToast("info", getT().toastPlayerOut(out?.name ?? "?"));
         break;
       }
 
@@ -255,12 +253,12 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
 
       case "buffer_share":
         set({ myHand: payload.cards, myLayer: "buffer" });
-        get().pushToast("success", "You received your buffer share");
+        get().pushToast("success", getT().toastBufferShare);
         break;
 
       case "hidden_revealed":
         set({ myHidden: payload.cards, myLayer: "hidden" });
-        get().pushToast("info", "Your hidden cards are revealed");
+        get().pushToast("info", getT().toastHiddenRevealed);
         break;
 
       case "error":
