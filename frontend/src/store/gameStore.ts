@@ -26,6 +26,7 @@ export interface GameState {
   phase: Phase;
   ws: WebSocket | null;
   connected: boolean;
+  connectionLost: boolean; // true after all reconnect retries exhausted
   roomId: string | null;
   myName: string;
   myPlayerId: string | null;
@@ -54,6 +55,7 @@ export interface GameState {
 interface Actions {
   setWs: (ws: WebSocket | null) => void;
   setConnected: (v: boolean) => void;
+  setConnectionLost: (v: boolean) => void;
   setIdentity: (room: string, name: string, host: boolean) => void;
   send: (msg: ClientMessage) => void;
   dispatch: (msg: ServerMessage) => void;
@@ -69,6 +71,7 @@ const initial: GameState = {
   phase: "lobby",
   ws: null,
   connected: false,
+  connectionLost: false,
   roomId: null,
   myName: "",
   myPlayerId: null,
@@ -96,6 +99,7 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
 
   setWs: (ws) => set({ ws }),
   setConnected: (v) => set({ connected: v }),
+  setConnectionLost: (v) => set({ connectionLost: v }),
   setIdentity: (room, name, host) =>
     set({ roomId: room, myName: name, isHost: host }),
 

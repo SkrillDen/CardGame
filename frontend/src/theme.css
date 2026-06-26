@@ -579,6 +579,39 @@ input {
   line-height: 1.5;
 }
 
+/* ---- Connection lost banner -------------------------------------------- */
+
+.connection-lost-banner {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  color: var(--ink-faint);
+  font-size: 14px;
+}
+.connection-lost-banner button {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.connection-lost-banner button:hover {
+  opacity: 0.85;
+}
+
 /* ---- Toasts ------------------------------------------------------------ */
 
 .toasts {

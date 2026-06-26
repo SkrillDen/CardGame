@@ -15,8 +15,15 @@ export default function App() {
   const ws = useWebSocket();
   const phase = useGameStore((s) => s.phase);
   const connected = useGameStore((s) => s.connected);
+  const connectionLost = useGameStore((s) => s.connectionLost);
   const roomId = useGameStore((s) => s.roomId);
+  const resetForLobby = useGameStore((s) => s.resetForLobby);
   const [rulesOpen, setRulesOpen] = useState(false);
+
+  function handleBackToLobby() {
+    ws.disconnect();
+    resetForLobby();
+  }
 
   return (
     <div className="app">
@@ -54,6 +61,16 @@ export default function App() {
       )}
 
       {phase === "over" && <GameOver />}
+
+      {connectionLost && phase !== "lobby" && (
+        <div className="connection-lost-banner">
+          <span>Соединение потеряно</span>
+          <button type="button" onClick={handleBackToLobby}>
+            Вернуться в меню
+          </button>
+        </div>
+      )}
+
       <RulesModal open={rulesOpen} onClose={() => setRulesOpen(false)} />
       <Toasts />
     </div>

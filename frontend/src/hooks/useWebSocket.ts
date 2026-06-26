@@ -28,6 +28,7 @@ export function useWebSocket() {
   const connect = useCallback((roomId: string, name: string) => {
     manualClose = false;
     retries = 0;
+    useGameStore.getState().setConnectionLost(false);
     const url = `${WS_BASE}/ws/${encodeURIComponent(roomId)}?name=${encodeURIComponent(name)}`;
     useGameStore.getState().setIdentity(roomId, name, true);
     open(url);
@@ -81,6 +82,7 @@ function open(url: string) {
       useGameStore
         .getState()
         .pushToast("error", "Connection lost — gave up reconnecting");
+      useGameStore.getState().setConnectionLost(true);
       return;
     }
     const delay = Math.min(BASE_DELAY * 2 ** retries, MAX_DELAY);

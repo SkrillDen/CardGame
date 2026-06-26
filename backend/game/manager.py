@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Dict, List, Optional
 
 from fastapi import WebSocket
@@ -30,6 +31,11 @@ from .models import Card, GameRoom, Player, make_event
 
 logger = logging.getLogger("durak.manager")
 
+# Rooms with no active connections are deleted after this many seconds.
+ROOM_IDLE_TTL = 3600  # 1 hour
+# Hard cap to protect server memory.
+MAX_ROOMS = 100
+
 
 class ConnectionManager:
     """In-memory registry of rooms and their open WebSocket connections."""
@@ -41,6 +47,8 @@ class ConnectionManager:
         self.connections: Dict[str, Dict[str, WebSocket]] = {}
         # websocket -> (room_id, player_id) for clean disconnect bookkeeping
         self.sock_index: Dict[WebSocket, tuple] = {}
+        # room_id -> timestamp of last activity (or last connection drop)
+        self.last_active: Dict[str, float] = {}
 
     # ------------------------------------------------------------------
     # Room lifecycle
@@ -50,9 +58,12 @@ class ConnectionManager:
         """Create a new room and return ``(GameRoom, player_id)``."""
         if room_id in self.rooms:
             raise ValueError(f"Room {room_id!r} already exists")
+        if len(self.rooms) >= MAX_ROOMS:
+            raise ValueError("Server is full — too many active rooms, try again later")
         room, _ = create_room(name=name, room_id=room_id)
         self.rooms[room_id] = room
         self.connections[room_id] = {}
+        self.last_active[room_id] = time.monotonic()
         return room, room.players[0].id
 
     def join_room(self, room_id: str, name: str) -> tuple:
@@ -84,6 +95,7 @@ class ConnectionManager:
         """Register a WebSocket for ``(room_id, player_id)``."""
         self.connections.setdefault(room_id, {})[player_id] = ws
         self.sock_index[ws] = (room_id, player_id)
+        self.last_active[room_id] = time.monotonic()
 
     def disconnect(self, ws: WebSocket) -> None:
         """Remove a WebSocket from its room (no-op if unknown)."""
@@ -95,6 +107,34 @@ class ConnectionManager:
         # Only remove if it's still this socket (reconnects replace it).
         if conns.get(player_id) is ws:
             conns.pop(player_id, None)
+        # Record when the room went idle (no connections left).
+        if not conns:
+            self.last_active[room_id] = time.monotonic()
+
+    def cleanup_room(self, room_id: str) -> None:
+        """Immediately delete a room and all its connections."""
+        self.rooms.pop(room_id, None)
+        self.connections.pop(room_id, None)
+        self.last_active.pop(room_id, None)
+        logger.info("Cleaned up room %s", room_id)
+
+    def purge_idle_rooms(self) -> int:
+        """Delete rooms that have had no connections for ROOM_IDLE_TTL seconds.
+
+        Returns the number of rooms deleted.
+        """
+        now = time.monotonic()
+        to_delete = [
+            room_id
+            for room_id, ts in list(self.last_active.items())
+            if not self.connections.get(room_id)  # no active sockets
+            and (now - ts) > ROOM_IDLE_TTL
+        ]
+        for room_id in to_delete:
+            self.cleanup_room(room_id)
+        if to_delete:
+            logger.info("Purged %d idle room(s): %s", len(to_delete), to_delete)
+        return len(to_delete)
 
     # ------------------------------------------------------------------
     # Broadcasting

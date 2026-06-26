@@ -16,6 +16,7 @@ Protocol (JSON over the socket):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -27,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from game.engine import _public_state  # noqa: F401  (re-exported for convenience)
+from game.models import make_event
 from game.manager import ConnectionManager
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +48,19 @@ app.add_middleware(
 )
 
 manager = ConnectionManager()
+
+PURGE_INTERVAL = 600  # run idle-room cleanup every 10 minutes
+
+
+async def _purge_loop() -> None:
+    while True:
+        await asyncio.sleep(PURGE_INTERVAL)
+        manager.purge_idle_rooms()
+
+
+@app.on_event("startup")
+async def startup() -> None:
+    asyncio.create_task(_purge_loop())
 
 
 def _room_overview(room_id: str) -> Optional[dict]:
@@ -104,6 +119,19 @@ async def websocket_endpoint(
 
         for ev in pub(room):
             await websocket.send_text(json.dumps(ev))
+        # Restore the player's private hand so they can play after a reconnect
+        # or page refresh (public state alone doesn't include card contents).
+        player = room.get_player(player_id)
+        if player is not None and not player.eliminated:
+            hand_ev = make_event(
+                "hand_update", cards=[str(c) for c in player.active_cards]
+            )
+            await websocket.send_text(json.dumps(hand_ev))
+            if player.layer == "hidden" and player.hidden_taken:
+                hidden_ev = make_event(
+                    "hidden_revealed", cards=[str(c) for c in player.hidden_cards]
+                )
+                await websocket.send_text(json.dumps(hidden_ev))
 
     # --- Main dispatch loop ---
     try:
@@ -122,6 +150,13 @@ async def websocket_endpoint(
             events = manager.dispatch(room_id, player_id, msg)
             if events:
                 await manager.broadcast(room_id, events)
+                # Schedule room cleanup shortly after game_over so all clients
+                # receive the final event before the room is removed.
+                if any(e.get("type") == "game_over" for e in events):
+                    async def _deferred_cleanup(rid: str = room_id) -> None:
+                        await asyncio.sleep(30)
+                        manager.cleanup_room(rid)
+                    asyncio.create_task(_deferred_cleanup())
     except WebSocketDisconnect:
         logger.info("%s disconnected from room %s", name, room_id)
     finally:
