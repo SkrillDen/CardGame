@@ -168,14 +168,18 @@ def test_take_bottom_on_buffer_layer_stays_buffer_and_adds_card():
 
 def test_bito_clears_stack_and_closer_reopens():
     # 2 players, both active; stack already at 2 => bito on next beat.
-    players = [make_player("p0", [C("9H")]), make_player("p1", [C("JH")])]
+    # Give each player a spare card so the closer still holds a card to reopen
+    # with (an emptied hand would instead trigger buffer distribution and pass
+    # the turn — covered separately).
+    players = [make_player("p0", [C("9H"), C("9C")]),
+               make_player("p1", [C("JH"), C("JC")])]
     room = room_with(players, trump="D", stack=[C("7H")], current_idx=1)
     # p1 plays JH -> stack [7H, JH] length 2 == active => bito.
     room, events = play_card(room, "p1", C("JH"))
     assert "bito" in event_types(events)
     assert room.table_stack == []
     assert room.bito_count == 1
-    # Closer (p1) reopens the next stack: stays current.
+    # Closer (p1) still holds JC, so they reopen the next stack: stays current.
     assert room.current_player.id == "p1"
 
 
@@ -219,7 +223,10 @@ def test_bito_contribution_phase_3p_every_time():
 # ===========================================================================
 
 def test_contribute_buffer_collects_and_clears_phase():
-    players = [make_player("p0", [C("9H")]), make_player("p1", [C("JH")])]
+    # Two main cards each so contributing one doesn't empty the hand (an empty
+    # main during contribution triggers buffer distribution — tested elsewhere).
+    players = [make_player("p0", [C("9H"), C("9C")]),
+               make_player("p1", [C("JH"), C("JC")])]
     room = room_with(players, trump="D", stack=[])
     room.contribution_phase = True
     room.contribution_due = {"p0", "p1"}
@@ -228,7 +235,7 @@ def test_contribute_buffer_collects_and_clears_phase():
     hand_updates = [e for e in events if e["type"] == "hand_update"]
     assert len(hand_updates) == 1
     assert hand_updates[0]["payload"]["_to"] == "p0"
-    assert hand_updates[0]["payload"]["cards"] == []
+    assert hand_updates[0]["payload"]["cards"] == ["9C"]
     game_states = [e for e in events if e["type"] == "game_state"]
     assert len(game_states) == 1
     assert game_states[0]["payload"]["buffer_size"] == 1

@@ -51,6 +51,8 @@ export interface GameState {
   selectedCard: CardCode | null;
   loserId: string | null;
   toasts: Toast[];
+  lastPlayed: CardCode | null; // last card played to the table (any player)
+  bitoFlash: CardCode | null;  // winning card kept visible briefly after bito
 }
 
 interface Actions {
@@ -93,6 +95,8 @@ const initial: GameState = {
   selectedCard: null,
   loserId: null,
   toasts: [],
+  lastPlayed: null,
+  bitoFlash: null,
 };
 
 export const useGameStore = create<GameState & Actions>((set, get) => ({
@@ -180,6 +184,9 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
 
       // ---- Narrative events (mostly toasts; state comes via game_state) ----
       case "card_played":
+        // Remember the last card on the table so we can keep the winning card
+        // visible for a moment when the stack is cleared to bito.
+        set({ lastPlayed: payload.card });
         // If I played, drop it from my hand optimistically (server corrects).
         if (payload.player_id === get().myPlayerId) {
           set((s) => ({
@@ -199,15 +206,28 @@ export const useGameStore = create<GameState & Actions>((set, get) => ({
         }
         break;
 
-      case "bito":
+      case "bito": {
         get().pushToast("success", getT().toastBito(payload.bito_count));
+        // Keep the last (winning) card visible briefly instead of letting the
+        // whole stack vanish instantly when the next game_state empties it.
+        const winning = get().lastPlayed;
+        if (winning) {
+          set({ bitoFlash: winning });
+          setTimeout(() => {
+            if (get().bitoFlash === winning) set({ bitoFlash: null });
+          }, 1500);
+        }
         break;
+      }
 
       case "buffer_request":
         get().pushToast("info", getT().toastContributeRequest);
         break;
 
       case "buffer_triggered":
+        // Apply the new trump immediately so the indicator and hand-legality
+        // hints update on this turn, not one move later.
+        set({ trump: payload.new_trump });
         get().pushToast("info", getT().toastBufferTriggered(payload.new_trump));
         break;
 

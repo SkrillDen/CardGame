@@ -164,6 +164,7 @@ def _public_state(room: GameRoom) -> List[Event]:
                     "card_count": p.total_cards,
                     "layer": p.layer,
                     "eliminated": p.eliminated,
+                    "waiting_for_share": p.waiting_for_share,
                 }
                 for p in room.players
             ],
@@ -358,8 +359,39 @@ def contribute_buffer(
     events.append(
         make_event("hand_update", _to=player_id, cards=[str(c) for c in player.main_hand])
     )
-    if not room.contribution_due:
+
+    # Contributing the last main card empties the hand — the same "ran out of
+    # main cards" condition that a final play would create. Trigger the buffer
+    # distribution now (deferring this player's share) so they are not left
+    # stranded on an empty main layer with no way to draw into the buffer.
+    if (
+        room.is_two_three_player
+        and not room.buffer_distributed
+        and not player.main_hand
+    ):
         room.contribution_phase = False
+        room.contribution_due = set()
+        _, ev = trigger_buffer_distribution(room, player_id)
+        events.extend(ev)
+        # Other players whose main is already empty pick up their share now.
+        for p in room.players:
+            if p.id != player_id:
+                _, ev = check_layer_transition(room, p.id)
+                events.extend(ev)
+        # The current player (the bito closer, due to open the next stack) may
+        # now be unable to act — e.g. they are the deferred trigger with an
+        # empty main. Pass the turn on so play can continue.
+        cur = room.current_player
+        if cur.eliminated or cur.waiting_for_share or not cur.active_cards:
+            _advance_turn(room, events)
+    elif not room.contribution_due:
+        room.contribution_phase = False
+        # The contribution phase is over; the bito closer is due to open the
+        # next stack. If they can no longer act (e.g. they eliminated
+        # themselves on the closing play), pass the turn on.
+        cur = room.current_player
+        if cur.eliminated or cur.waiting_for_share or not cur.active_cards:
+            _advance_turn(room, events)
     events.extend(_public_state(room))
     return room, events
 
@@ -395,20 +427,7 @@ def check_bito(room: GameRoom) -> Tuple[GameRoom, List[Event]]:
     # Clear deferred waits: waiting players take their share now (no skip).
     for p in room.players:
         if p.waiting_for_share:
-            p.waiting_for_share = False
-            share = p.pending_share
-            p.pending_share = []
-            p.buffer_share = list(share)
-            _set_layer(room, p, "buffer", events)
-            if share:
-                events.append(
-                    make_event(
-                        "buffer_share",
-                        _to=p.id,
-                        cards=[str(c) for c in share],
-                        deferred=True,
-                    )
-                )
+            _resolve_share(room, p, events)
 
     # Closer opens the next stack (current player unchanged).
     # Contribution phase (2-3p, undistributed only).
@@ -429,17 +448,51 @@ def check_bito(room: GameRoom) -> Tuple[GameRoom, List[Event]]:
 # (i) Turn advancement
 # ===========================================================================
 
+def _resolve_share(room: GameRoom, player: Player, events: List[Event]) -> None:
+    """Give a deferred player their pending buffer share now (no turn penalty).
+
+    Used both on bito (all waiting players collect their share) and when the
+    turn genuinely lands on a waiting player who must OPEN a fresh stack but has
+    no main cards to do it with — otherwise the game would stall on a player
+    with nothing to play and no stack to take from.
+    """
+    player.waiting_for_share = False
+    share = player.pending_share
+    player.pending_share = []
+    # A deferred trigger may have been forced to take bottom cards back into
+    # their (reopened) main hand while waiting. Carry those over so they are
+    # not stranded when the player moves onto the buffer layer.
+    leftover_main = list(player.main_hand)
+    player.main_hand = []
+    player.buffer_share = leftover_main + list(share)
+    _set_layer(room, player, "buffer", events)
+    if player.buffer_share:
+        events.append(
+            make_event(
+                "buffer_share",
+                _to=player.id,
+                cards=[str(c) for c in player.buffer_share],
+                deferred=True,
+            )
+        )
+
+
 def _advance_turn(room: GameRoom, events: List[Event]) -> None:
     """Move to the next eligible player, applying skips and forced takes.
 
     * skip eliminated players;
     * honour ``skip_next_turn`` (clear it, emit turn_skipped, keep going);
     * a waiting-for-share player with a non-empty stack is forced to take the
-      bottom card (failed beat) into their main hand, then we move on.
+      bottom card (failed beat) into their main hand, then we move on;
+    * a waiting-for-share player who must OPEN an empty stack instead collects
+      their deferred share immediately (they have no main card to open with);
+    * a player whose current active layer is empty is transitioned down
+      (main->buffer->hidden->out) so the turn never stops on someone who has
+      no card to play and no stack to take from.
     """
     n = room.num_players
-    # At most one full lap; guards against pathological all-skip loops.
-    for _ in range(n * 2 + 1):
+    # Allow several transitions/skips per lap; the bound guards against hangs.
+    for _ in range(n * 4 + 2):
         room.current_idx = (room.current_idx + 1) % n
         p = room.current_player
         if p.eliminated:
@@ -448,21 +501,39 @@ def _advance_turn(room: GameRoom, events: List[Event]) -> None:
             p.skip_next_turn = False
             events.append(make_event("turn_skipped", player_id=p.id))
             continue
-        if p.waiting_for_share and room.table_stack:
-            # Forced failed beat: take the bottom card into the main hand.
-            bottom = room.table_stack.pop(0)
-            p.main_hand.append(bottom)
-            events.append(
-                make_event(
-                    "card_taken",
-                    player_id=p.id,
-                    card=str(bottom),
-                    reason="forced",
+        if p.waiting_for_share:
+            if room.table_stack:
+                # Forced failed beat: take the bottom card into the main hand
+                # (penalty) and lose this turn.
+                bottom = room.table_stack.pop(0)
+                p.main_hand.append(bottom)
+                events.append(
+                    make_event(
+                        "card_taken",
+                        player_id=p.id,
+                        card=str(bottom),
+                        reason="forced",
+                    )
                 )
-            )
-            events.append(make_event("hand_update", _to=p.id, cards=[str(c) for c in p.main_hand]))
+                events.append(make_event("hand_update", _to=p.id, cards=[str(c) for c in p.main_hand]))
+                continue
+            # Empty stack: they'd have to open but hold no main cards. Give them
+            # their deferred share now so they can act.
+            _resolve_share(room, p, events)
+
+        # Ensure the player actually has something to play; if their active
+        # layer is empty, move them down a layer (may reveal hidden / eliminate).
+        if not p.active_cards and not p.eliminated:
+            _, ev = check_layer_transition(room, p.id)
+            events.extend(ev)
+        if p.eliminated:
             continue
-        break
+
+        # The player can act if they have a card to play or a stack to take.
+        if p.active_cards or room.table_stack:
+            break
+        # Otherwise keep scanning (the transitions above should prevent this
+        # from persisting; the loop bound is the final safety net).
 
 
 # ===========================================================================
@@ -542,9 +613,14 @@ def play_card(
 
     # ---- Advance turn (unless contribution phase now active or game over) ----
     if not room.contribution_phase and room.loser_id is None:
-        # Only advance if the stack is non-empty; if bito cleared it, the
-        # closer stays current to open the next stack.
+        # Normally: if bito cleared the stack, the closer stays current to open
+        # the next stack. But if the closer just eliminated themselves (played
+        # their last card) or otherwise has nothing to open with, pass the turn
+        # on to the next player who can act.
+        closer = room.current_player
         if room.table_stack:
+            _advance_turn(room, events)
+        elif closer.eliminated or not closer.active_cards:
             _advance_turn(room, events)
         events.extend(_public_state(room))
 

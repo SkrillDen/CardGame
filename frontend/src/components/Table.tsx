@@ -13,6 +13,7 @@ export function Table() {
   const bitoCount = useGameStore((s) => s.bitoCount);
   const bufferSize = useGameStore((s) => s.bufferSize);
   const bufferDistributed = useGameStore((s) => s.bufferDistributed);
+  const bitoFlash = useGameStore((s) => s.bitoFlash);
 
   return (
     <div className="table-panel">
@@ -24,12 +25,18 @@ export function Table() {
       </div>
 
       <div className="stack">
-        {stack.length === 0 ? (
-          <span className="stack-empty">{t.stackEmpty}</span>
-        ) : (
+        {stack.length > 0 ? (
           stack.map((c, i) => (
             <CardView key={`${c}-${i}`} code={c} selected={i === stack.length - 1} />
           ))
+        ) : bitoFlash ? (
+          // Bito just cleared the stack — briefly hold the winning card so it
+          // doesn't vanish instantly.
+          <div className="bito-flash" title={t.chipBito(bitoCount)}>
+            <CardView code={bitoFlash} selected />
+          </div>
+        ) : (
+          <span className="stack-empty">{t.stackEmpty}</span>
         )}
       </div>
 

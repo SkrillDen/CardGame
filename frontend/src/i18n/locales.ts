@@ -58,6 +58,8 @@ export const locales = {
 
     // ---- Player list ---------------------------------------------------------
     tagTurn: "Turn",
+    tagContributing: "To contribute",
+    tagWaitingShare: "Waiting for buffer",
     cardCount: (n: number) => `${n} cards`,
 
     // ---- Player badge --------------------------------------------------------
@@ -152,6 +154,8 @@ export const locales = {
 
     // ---- Список игроков ------------------------------------------------------
     tagTurn: "Ход",
+    tagContributing: "Должен внести",
+    tagWaitingShare: "Ждёт буфер",
     cardCount: (n: number) => `${n} карт`,
 
     // ---- Значок скрытых карт -------------------------------------------------

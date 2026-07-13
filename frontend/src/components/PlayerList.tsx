@@ -12,23 +12,38 @@ export function PlayerList() {
   const currentId = useGameStore((s) => s.currentId);
   const myId = useGameStore((s) => s.myPlayerId);
   const myHidden = useGameStore((s) => s.myHidden);
+  const contributionPhase = useGameStore((s) => s.contributionPhase);
+  const contributionDue = useGameStore((s) => s.contributionDue);
 
   return (
     <div className="player-list">
       {players.map((p, i) => {
         const isCurrent = p.id === currentId;
         const isMe = p.id === myId;
+        // During the buffer/contribution phases, make it clear whom everyone is
+        // waiting on: players who still owe a contribution, or a deferred player
+        // waiting for their buffer share.
+        const isDue = contributionPhase && contributionDue.includes(p.id);
+        const isWaitingShare = !!p.waiting_for_share;
         return (
           <div
             key={p.id}
-            className={`player-row ${isCurrent ? "current" : ""} ${p.eliminated ? "eliminated" : ""}`}
+            className={`player-row ${isCurrent ? "current" : ""} ${
+              isDue || isWaitingShare ? "waiting" : ""
+            } ${p.eliminated ? "eliminated" : ""}`}
           >
             <div className="avatar">{initials(p.name)}</div>
             <div className="meta">
               <span className="name">
                 {p.name}
                 {i === 0 && <span className="tag host">{t.tagHost}</span>}
-                {isCurrent && !p.eliminated && <span className="tag current">{t.tagTurn}</span>}
+                {isCurrent && !p.eliminated && !contributionPhase && (
+                  <span className="tag current">{t.tagTurn}</span>
+                )}
+                {isDue && <span className="tag waiting">{t.tagContributing}</span>}
+                {isWaitingShare && !isDue && (
+                  <span className="tag waiting">{t.tagWaitingShare}</span>
+                )}
               </span>
               <span className="sub">
                 <span>{t.cardCount(p.card_count)}</span>

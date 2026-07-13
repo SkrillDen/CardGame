@@ -17,6 +17,7 @@ export interface PlayerView {
   card_count: number;
   layer: Layer;
   eliminated?: boolean;
+  waiting_for_share?: boolean;
 }
 
 // ---- Server -> Client message types ---------------------------------------
