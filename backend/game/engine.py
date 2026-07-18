@@ -494,8 +494,12 @@ def _advance_turn(room: GameRoom, events: List[Event]) -> None:
     * a player whose current active layer is empty is transitioned down
       (main->buffer->hidden->out) so the turn never stops on someone who has
       no card to play and no stack to take from.
+    * a player is never made to beat their own card: if honouring skips would
+      hand the turn back to the player who just played onto the stack, the skip
+      is dropped and the turn goes to the next opponent instead.
     """
     n = room.num_players
+    starter = room.current_idx  # the player who just acted (owns the top card)
     # Allow several transitions/skips per lap; the bound guards against hangs.
     for _ in range(n * 4 + 2):
         room.current_idx = (room.current_idx + 1) % n
@@ -524,6 +528,26 @@ def _advance_turn(room: GameRoom, events: List[Event]) -> None:
             break
         # Otherwise keep scanning (the transitions above should prevent this
         # from persisting; the loop bound is the final safety net).
+
+    # Self-beat guard: if every opponent got skipped and the turn came back to
+    # the player who just played while their card still tops the stack, they
+    # would have to beat their own card. Hand the turn to the next opponent who
+    # can act instead (their skip is already spent).
+    if room.current_idx == starter and room.table_stack and room.num_active > 1:
+        for _ in range(n):
+            room.current_idx = (room.current_idx + 1) % n
+            if room.current_idx == starter:
+                break  # nobody else can act; leave as-is
+            q = room.current_player
+            if q.eliminated:
+                continue
+            if not q.active_cards:
+                _, ev = check_layer_transition(room, q.id)
+                events.extend(ev)
+            if q.eliminated:
+                continue
+            if q.active_cards or room.table_stack:
+                break
 
 
 # ===========================================================================

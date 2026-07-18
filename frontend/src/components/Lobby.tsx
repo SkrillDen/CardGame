@@ -1,4 +1,5 @@
-// Lobby: name + room-id entry, create/join, roster, host-only Start button.
+// Lobby: name + room-id entry, create/join, roster with connected count, and a
+// Start button any seated player can use once there are enough players.
 
 import { useState } from "react";
 import { useGameStore } from "../store/gameStore";
@@ -14,7 +15,6 @@ export function Lobby({ ws }: Props) {
   const [name, setName] = useState("");
   const [roomId, setRoomId] = useState("");
   const players = useGameStore((s) => s.players);
-  const isHost = useGameStore((s) => s.isHost);
   const phase = useGameStore((s) => s.phase);
   const connected = useGameStore((s) => s.connected);
 
@@ -69,6 +69,9 @@ export function Lobby({ ws }: Props) {
           <>
             <div className="roster">
               <h3>{t.rosterHeading(players.length)}</h3>
+              <p className="hint" style={{ marginTop: -4, marginBottom: 8 }}>
+                {t.lobbyConnectedCount(players.length)}
+              </p>
               <ul>
                 {players.map((p, i) => (
                   <li key={p.id}>
@@ -81,18 +84,15 @@ export function Lobby({ ws }: Props) {
               </ul>
             </div>
             <div className="actions" style={{ marginTop: 16 }}>
-              {isHost ? (
-                <button
-                  className="primary"
-                  onClick={handleStart}
-                  disabled={players.length < 2}
-                  title={players.length < 2 ? t.startDisabledHint : undefined}
-                >
-                  {t.btnStart}
-                </button>
-              ) : (
-                <span className="hint">{t.waitingForHost}</span>
-              )}
+              {/* Anyone in the room can start once there are enough players. */}
+              <button
+                className="primary"
+                onClick={handleStart}
+                disabled={players.length < 2}
+                title={players.length < 2 ? t.startDisabledHint : undefined}
+              >
+                {t.btnStart}
+              </button>
             </div>
           </>
         )}

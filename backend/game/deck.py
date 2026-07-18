@@ -51,21 +51,25 @@ def deal_hands(num_players: int, rng: random.Random) -> Tuple[List[List[Card]], 
     deck = shuffle_deck(build_deck(), rng)
 
     hidden: List[List[Card]] = [[] for _ in range(num_players)]
-    # Reserve the opening table card first (last card of the deck).
-    opening_card = deck.pop()
-    remaining = deck
 
     # Deal 2 hidden cards per player.
     for _ in range(2):
         for i in range(num_players):
-            hidden[i].append(remaining.pop())
+            hidden[i].append(deck.pop())
 
-    # Everything left is main-hand pool; deal round-robin.
+    # Everything left is the main-hand pool; deal round-robin.
     main: List[List[Card]] = [[] for _ in range(num_players)]
     idx = 0
-    while remaining:
-        main[idx % num_players].append(remaining.pop())
+    while deck:
+        main[idx % num_players].append(deck.pop())
         idx += 1
+
+    # The opening table card is player 0's automatic first move, so it is taken
+    # from player 0's OWN hand rather than off the top of the deck. That keeps
+    # the total material dealt to every player equal (previously the opener came
+    # from the deck AND seat 0 got the round-robin remainder, giving seat 0 two
+    # extra cards in a 2-player game).
+    opening_card = main[0].pop()
 
     return hidden, main, opening_card
 

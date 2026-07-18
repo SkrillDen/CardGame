@@ -58,6 +58,23 @@ def test_deal_hands_counts_for_five_players(rng):
     assert len(seen) == 36
 
 
+@pytest.mark.parametrize("n", [2, 3, 4])
+def test_deal_hands_equal_material_per_player(n):
+    """Every player should be dealt the same total amount of material. Player 0
+    auto-plays the opening card, so it is taken from their own hand — otherwise
+    seat 0 ended up with extra cards (2 more than seat 1 in a 2-player game)."""
+    hidden, main, opener = deal_hands(n, random.Random(5))
+    # Material = hidden + main, plus the opener which came from player 0's hand.
+    material = [len(hidden[i]) + len(main[i]) + (1 if i == 0 else 0) for i in range(n)]
+    assert len(set(material)) == 1, f"unequal deal: {material}"
+
+
+def test_deal_hands_opener_not_duplicated_in_hands():
+    hidden, main, opener = deal_hands(2, random.Random(3))
+    all_hand_codes = {c.code for h in hidden for c in h} | {c.code for m in main for c in m}
+    assert opener.code not in all_hand_codes
+
+
 def test_deal_hands_is_deterministic_with_seeded_rng():
     h1, m1, o1 = deal_hands(3, random.Random(99))
     h2, m2, o2 = deal_hands(3, random.Random(99))

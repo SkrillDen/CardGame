@@ -330,6 +330,22 @@ def test_waiting_trigger_turn_lands_and_can_take_not_force_fed():
     assert room.players[0].layer == "main"
 
 
+def test_player_never_beats_their_own_card_in_2p():
+    # 2p: p1 is on the hidden layer with skip_next_turn set (just revealed).
+    # p0 opens a stack; honouring p1's skip would loop the turn back to p0 and
+    # force them to beat their own card. Instead the turn must go to p1.
+    p0 = make_player("p0", [], layer="buffer")
+    p0.buffer_share = [C("9D"), C("KD")]
+    p1 = make_player("p1", [], hidden=[C("7C")], layer="hidden")
+    p1.hidden_taken = True
+    p1.skip_next_turn = True
+    room = room_with([p0, p1], trump="D", stack=[], current_idx=0)
+    room, events = play_card(room, "p0", C("9D"))
+    assert room.table_stack[-1].code == "9D"
+    # The turn must NOT rest on p0 (who owns the top card).
+    assert room.current_player.id == "p1"
+
+
 def test_waiting_trigger_may_play_a_card_it_holds():
     # A waiting-for-share player who holds a (reopened) main card may play it,
     # rather than being blocked until their share is distributed.

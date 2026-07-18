@@ -29,6 +29,8 @@ export const locales = {
     btnJoin: "Join",
     btnCreateJoin: "Create & Join",
     rosterHeading: (n: number) => `Players (${n})`,
+    lobbyConnectedCount: (n: number) =>
+      n === 1 ? `${n} player connected` : `${n} players connected`,
     tagHost: "Host",
     btnStart: "Start game",
     startDisabledHint: "Need at least 2 players",
@@ -125,6 +127,7 @@ export const locales = {
     btnJoin: "Войти",
     btnCreateJoin: "Создать и войти",
     rosterHeading: (n: number) => `Игроки (${n})`,
+    lobbyConnectedCount: (n: number) => `Подключено игроков: ${n}`,
     tagHost: "Хост",
     btnStart: "Начать игру",
     startDisabledHint: "Нужно минимум 2 игрока",
