@@ -3,10 +3,12 @@
 // reject a play the client thinks is legal.
 
 // Mirrors backend `validate_beat` in game/engine.py exactly:
-//   * Spades are a closed domain — beaten only by a higher spade, and a spade
-//     only ever beats a lower spade (in every trump context).
-//   * Same non-spade suit: higher rank wins.
-//   * Non-spade trump beats a non-trump; trump beats trump only by higher rank.
+//   * When spades are NOT trump they are a closed domain — beaten only by a
+//     higher spade, and a spade never beats a non-spade.
+//   * When spades ARE trump they act as a normal trump: any spade beats any
+//     non-spade, higher spade beats lower spade.
+//   * Same suit: higher rank wins.
+//   * Trump beats a non-trump; trump beats trump only by higher rank.
 
 import type { CardCode, Suit } from "../types";
 import { parseCard } from "./cards";
@@ -15,11 +17,14 @@ export function canBeat(toBeat: CardCode, played: CardCode, trump: Suit): boolea
   const a = parseCard(toBeat);
   const b = parseCard(played);
 
-  if (a.suit === "S") {
-    return b.suit === "S" && b.rank > a.rank;
-  }
-  if (b.suit === "S") {
-    return false;
+  // Closed spade domain only applies while spades are not the trump.
+  if (trump !== "S") {
+    if (a.suit === "S") {
+      return b.suit === "S" && b.rank > a.rank;
+    }
+    if (b.suit === "S") {
+      return false;
+    }
   }
   if (a.suit === b.suit) {
     return b.rank > a.rank;

@@ -48,8 +48,9 @@ describe("canBeat — spade immunity (doing the beating)", () => {
   it("spade cannot beat a non-spade", () => {
     expect(canBeat("7H", "AS", "H")).toBe(false);
   });
-  it("spade cannot beat a non-spade even if spades are trump", () => {
-    expect(canBeat("7H", "AS", "S")).toBe(false);
+  it("spade beats a non-spade when spades are trump", () => {
+    expect(canBeat("7H", "AS", "S")).toBe(true);
+    expect(canBeat("AH", "6S", "S")).toBe(true);
   });
   it("spade cannot beat a trump card", () => {
     expect(canBeat("7D", "AS", "D")).toBe(false);

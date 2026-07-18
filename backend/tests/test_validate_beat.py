@@ -1,8 +1,9 @@
 """Exhaustive tests for the beating rule across every trump context.
 
-Spades are a closed domain in all contexts: a spade is only ever beaten by a
-higher spade, and a spade only ever beats a lower spade — even when trump is
-Spades itself.
+Spades are a closed domain ONLY while they are not the trump: a spade is beaten
+only by a higher spade, and a spade never beats a non-spade. When spades ARE the
+trump they behave as a normal trump suit — any spade beats any non-spade, and a
+higher spade beats a lower one.
 """
 
 from game.engine import validate_beat, can_beat_any
@@ -90,10 +91,11 @@ def test_spade_cannot_beat_non_spade():
     assert validate_beat(C("7H"), C("AS"), trump="H") is False
 
 
-def test_spade_cannot_beat_non_spade_even_if_spades_trump():
-    # When trump = Spades, the 7H is non-trump; a spade (trump) cannot beat
-    # it per the closed-domain rule.
-    assert validate_beat(C("7H"), C("AS"), trump="S") is False
+def test_spade_beats_non_spade_when_spades_trump():
+    # When trump = Spades, spades are a normal trump: any spade beats a
+    # non-spade (the closed-domain restriction no longer applies).
+    assert validate_beat(C("7H"), C("AS"), trump="S") is True
+    assert validate_beat(C("AH"), C("6S"), trump="S") is True
 
 
 def test_spade_cannot_beat_trump_card():

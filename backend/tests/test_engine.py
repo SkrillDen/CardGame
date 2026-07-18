@@ -305,13 +305,10 @@ def test_deferred_trigger_takes_share_on_bito_no_skip():
     assert buffer_shares[0]["payload"]["cards"] == ["9C", "6S"]
 
 
-def test_forced_take_bottom_when_turn_returns_to_waiting_trigger():
-    # 2 players. p0 is waiting for share with a non-empty stack.
-    # It's p1's turn; p1 fails to beat and is forced... but p1 cannot beat.
-    # Instead we test the forced-take path directly via _advance_turn by
-    # having p1 take the bottom, advancing to p0 who is waiting.
-    from game.engine import _advance_turn
-
+def test_waiting_trigger_turn_lands_and_can_take_not_force_fed():
+    # 2 players. p0 is waiting for share with a non-empty stack. When the turn
+    # reaches p0 they are NOT force-fed a card; the turn simply rests on them so
+    # they may act (here: take the bottom, since they hold no cards to play).
     players = [
         make_player("p0", []),  # waiting, empty main
         make_player("p1", [C("6C")]),
@@ -320,19 +317,37 @@ def test_forced_take_bottom_when_turn_returns_to_waiting_trigger():
     room.players[0].waiting_for_share = True
     room.players[0].pending_share = [C("9C"), C("6S")]
     room.buffer_distributed = True
-    # p1 takes bottom -> stack becomes [9H], advance to p0.
+    # p1 takes bottom -> stack becomes [9H], turn advances to p0.
     room, events = take_bottom(room, "p1")
-    # Now current is p0; p0 is waiting with a non-empty stack -> forced take.
-    # That happens during _advance_turn invoked inside take_bottom.
-    assert room.current_player.id == "p0" or room.players[0].main_hand
-    # p0 should have received the bottom card into their reopened main hand.
+    # p0 is current, still waiting, with the stack available to take from.
+    assert room.current_player.id == "p0"
+    assert room.players[0].main_hand == []  # NOT force-fed
+    assert room.table_stack == [C("9H")]
+    # p0 chooses to take the bottom -> reopens their main hand with 9H and can
+    # play it on a later turn.
+    room, events = take_bottom(room, "p0")
     assert any(c.code == "9H" for c in room.players[0].main_hand)
     assert room.players[0].layer == "main"
-    p0_updates = [
-        e for e in events if e["type"] == "hand_update" and e["payload"]["_to"] == "p0"
+
+
+def test_waiting_trigger_may_play_a_card_it_holds():
+    # A waiting-for-share player who holds a (reopened) main card may play it,
+    # rather than being blocked until their share is distributed.
+    # 3 players so a 2-card stack doesn't trigger bito and clear the table.
+    players = [
+        make_player("p0", [C("KD")]),  # waiting but holding a card
+        make_player("p1", [C("6C")]),
+        make_player("p2", [C("6H")]),
     ]
-    assert len(p0_updates) == 1
-    assert p0_updates[0]["payload"]["cards"] == ["9H"]
+    room = room_with(players, trump="D", stack=[C("7H")], current_idx=0)
+    room.players[0].waiting_for_share = True
+    room.players[0].pending_share = [C("9C")]
+    room.buffer_distributed = True
+    # KD is a trump (D) and beats 7H; the play must be accepted, not rejected.
+    room, events = play_card(room, "p0", C("KD"))
+    assert "error" not in event_types(events)
+    assert room.table_stack[-1].code == "KD"
+    assert all(c.code != "KD" for c in room.players[0].main_hand)
 
 
 # ===========================================================================

@@ -48,29 +48,33 @@ Event = dict
 def validate_beat(card_to_beat: Card, card_played: Card, trump: str) -> bool:
     """Return True iff ``card_played`` legally beats ``card_to_beat``.
 
-    Spades are a closed domain — a spade can only ever be beaten by a higher
-    spade, and a spade can only ever beat a lower spade. This holds in every
-    trump context (including trump == Spades, where all spades are trump and
-    only a higher trump-spade beats a lower one).
+    When spades are NOT the trump they are a closed side domain — a spade can
+    only be beaten by a higher spade, and a spade can never beat a non-spade.
+    But when spades ARE the trump (which can happen after a mid-game trump
+    change), they behave as a normal trump suit: any spade beats any non-spade,
+    and a higher spade beats a lower one.
     """
     a, b = card_to_beat, card_played
 
-    # Spade being beaten: only a higher spade works (trump is irrelevant).
-    if a.suit == "S":
-        return b.suit == "S" and b.rank > a.rank
-    # Spade doing the beating against a non-spade: never allowed.
-    if b.suit == "S":
-        return False
-    # Both non-spade, same suit: higher rank wins.
+    # Closed spade domain only applies while spades are not the trump.
+    if trump != "S":
+        # Spade being beaten: only a higher spade works.
+        if a.suit == "S":
+            return b.suit == "S" and b.rank > a.rank
+        # Spade doing the beating against a non-spade: never allowed.
+        if b.suit == "S":
+            return False
+
+    # Same suit: higher rank wins (covers spade-vs-spade when spades are trump).
     if a.suit == b.suit:
         return b.rank > a.rank
-    # ``a`` is a non-spade trump: a non-trump ``b`` cannot beat it.
+    # ``a`` is trump: a non-trump ``b`` cannot beat it.
     if a.suit == trump:
         return False
-    # ``b`` is a non-spade trump: it beats the non-trump ``a``.
+    # ``b`` is trump: it beats the non-trump ``a``.
     if b.suit == trump:
         return True
-    # Different non-trump, non-spade suits: no beat.
+    # Different non-trump suits: no beat.
     return False
 
 
@@ -478,14 +482,15 @@ def _resolve_share(room: GameRoom, player: Player, events: List[Event]) -> None:
 
 
 def _advance_turn(room: GameRoom, events: List[Event]) -> None:
-    """Move to the next eligible player, applying skips and forced takes.
+    """Move to the next eligible player.
 
     * skip eliminated players;
     * honour ``skip_next_turn`` (clear it, emit turn_skipped, keep going);
-    * a waiting-for-share player with a non-empty stack is forced to take the
-      bottom card (failed beat) into their main hand, then we move on;
-    * a waiting-for-share player who must OPEN an empty stack instead collects
-      their deferred share immediately (they have no main card to open with);
+    * a waiting-for-share player takes their turn normally: they may play any
+      main cards they still hold (e.g. cards taken from the stack while waiting)
+      or take the bottom card. Only if they would have to OPEN an empty stack
+      with no main cards do they collect their deferred share early so they have
+      something to play;
     * a player whose current active layer is empty is transitioned down
       (main->buffer->hidden->out) so the turn never stops on someone who has
       no card to play and no stack to take from.
@@ -501,24 +506,9 @@ def _advance_turn(room: GameRoom, events: List[Event]) -> None:
             p.skip_next_turn = False
             events.append(make_event("turn_skipped", player_id=p.id))
             continue
-        if p.waiting_for_share:
-            if room.table_stack:
-                # Forced failed beat: take the bottom card into the main hand
-                # (penalty) and lose this turn.
-                bottom = room.table_stack.pop(0)
-                p.main_hand.append(bottom)
-                events.append(
-                    make_event(
-                        "card_taken",
-                        player_id=p.id,
-                        card=str(bottom),
-                        reason="forced",
-                    )
-                )
-                events.append(make_event("hand_update", _to=p.id, cards=[str(c) for c in p.main_hand]))
-                continue
-            # Empty stack: they'd have to open but hold no main cards. Give them
-            # their deferred share now so they can act.
+        if p.waiting_for_share and not room.table_stack and not p.main_hand:
+            # They must open a fresh stack but hold no main cards: give them
+            # their deferred share now so they can act (rather than stalling).
             _resolve_share(room, p, events)
 
         # Ensure the player actually has something to play; if their active
@@ -558,8 +548,6 @@ def play_card(
         return room, _err("unknown_player", "Unknown player")
     if room.current_player.id != player_id:
         return room, _err("not_your_turn", "It is not your turn")
-    if player.waiting_for_share:
-        return room, _err("waiting_for_share", "You are waiting for your buffer share")
 
     target = next((c for c in player.active_cards if c.code == card.code), None)
     if target is None:
